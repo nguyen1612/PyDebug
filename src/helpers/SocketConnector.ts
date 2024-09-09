@@ -1,51 +1,24 @@
-import { EventEmitter } from "events";
-import { DebugProtocol } from '@vscode/debugprotocol';
 import { Buffer } from "buffer";
+import { DebugProtocol } from '@vscode/debugprotocol';
+import { EventEmitter } from "events";
 import { Socket } from "net";
+
 import { RequestCommand } from "../types";
-import { DebuggerCommand } from "./DebuggerCommand";
 
 const IDENTIFIER = '\r\n\r\n';
 
 export class SocketConnector {
     private msgId: number;
-
     private socket: Socket;
-
     private rawData: Buffer;
-
     private contentLength = -1;
-
     private disposed = false;
-
     private events: EventEmitter;
-
-    public shareState: any;
-
-    private command: DebuggerCommand;
-
 
     constructor() {
         this.events = new EventEmitter();
         this.rawData = Buffer.alloc(0);
         this.msgId = 0;
-        this.command = new DebuggerCommand();
-        this.shareState = {
-            registerInit: false,
-            registerResponse: false,
-            resume: false,
-            seq: 0,
-            count: 0,
-            threadId: null,
-            start: false,
-            commands: [],
-        };
-    }
-
-    private bindHandler(fnc_name: string) {
-        return (data) => {
-            this[fnc_name](data);
-        }
     }
     
     public async init() {
@@ -54,9 +27,6 @@ export class SocketConnector {
             this.socket = new Socket();
             this.socket.connect(5678, "localhost", () => {
                 console.log('Connect to Python Debugpy server successfully');
-                this.initRequest(this.command.initialize());
-                this.initRequest(this.command.attach());
-                this.initRequest(this.command.configurationDone());
                 resolve(true);
             });
             this.socket.setTimeout(5000);
@@ -81,11 +51,21 @@ export class SocketConnector {
         return this;
     }
 
-    public initRequest(msg: RequestCommand) {
+    public removeListeners(event: string) {
+        this.events.removeAllListeners(event);
+        return this;
+    }
+
+    public doRequest(msg: RequestCommand) {
         msg.seq = ++this.msgId;
         msg.type = 'request';
         this.request(msg);
     }
+
+    public destroy() {
+        this.socket.destroy();
+    }
+
 
     private request(msg: RequestCommand) {
         const sMsg = JSON.stringify(msg);
@@ -95,17 +75,6 @@ export class SocketConnector {
         console.log();
         this.socket.write(data);
     }
-
-    public doRequest(msg: RequestCommand) {
-        msg.seq = ++this.msgId;
-        msg.type = 'request';
-        if (this.shareState.start) {
-            this.request(msg);
-        } else {
-            this.shareState.commands.push(msg);
-        }
-    }
-
 
     private dispatch(body: string): void {
         const message = JSON.parse(body) as DebugProtocol.ProtocolMessage;

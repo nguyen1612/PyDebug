@@ -9,19 +9,29 @@ export class Client {
 
     constructor() {
         this.socket = new SocketConnector();
-        this.handler = new DebuggerHandler(this.socket, this.socket.shareState);
+        this.handler = new DebuggerHandler(this.socket);
         this.command = new DebuggerCommand();
     }
 
     public async init() {
         await this.socket.init();
+        this.socket.doRequest(this.command.initialize());
+        this.socket.doRequest(this.command.attach());
+        this.socket.doRequest(this.command.configurationDone());
+        return await this.handler.threadStart();
     }
 
-    setBreakPoints(path: string, breakpoints: any[]) {
+    async setBreakPoints(path: string, breakpoints: any[]) {
         this.socket.doRequest(this.command.setBreakPoints(path, breakpoints));
+        return await this.handler.getCurrentStateData();
     }
 
-    next() {
+    async next() {
         this.socket.doRequest(this.command.next());
+        return await this.handler.getCurrentStateData();
+    }
+
+    async destroy() {
+        this.socket.destroy();
     }
 }

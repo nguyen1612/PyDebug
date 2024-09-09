@@ -1,7 +1,5 @@
-import { SocketConnector } from "./SocketConnector";
 import { DebuggerCommand } from "./DebuggerCommand";
-
-// Stop -> StackTrace -> Scope -> Variable
+import { SocketConnector } from "./SocketConnector";
 
 export class DebuggerHandler {
     private socket: SocketConnector;
@@ -9,35 +7,103 @@ export class DebuggerHandler {
     private command: DebuggerCommand;
     private variables: any;
 
-    constructor(socket: SocketConnector, shareState: any) {
+    constructor(socket: SocketConnector) {
         this.socket = socket;
-        this.shareState = shareState;
         this.command = new DebuggerCommand();
         this.variables = {
             scopes: [],
             idx_scope: 0,
+            frames: {},
             locals: [],
             globals: [],
             switch: false,
         }
-        this.setupHandlers();
+        this.shareState = {
+            registerInit: false,
+            registerResponse: false,
+            resume: false,
+            seq: 0,
+            count: 0,
+            threadId: null,
+            start: false,
+            commands: [],
+        };
+        // this.setupHandlers();
+    }
+
+    public threadStart() {
+        return new Promise((resolve, _) => {
+            const onEventThread = (data) => {
+                if (data.event == "thread" && data.body.reason == "started") {
+                    this.shareState.threadId = data.body.threadId;
+                    resolve(true);
+                }
+            }
+            this.socket.removeListeners('event_thread');
+            this.socket.on('event_thread', onEventThread);
+        });
+    }
+
+    public getCurrentStateData() {
+        return new Promise((resolve, _) => {
+            // Flow code: Stop -> StackTrace -> Scope -> Variable
+            const onStopped = (data) => {
+                if (data.body.reason === "breakpoint" || data.body.reason === "step") {
+                    const threadId = this.shareState.threadId;
+                    this.socket.doRequest(this.command.stackTrace(threadId));
+                }
+            };
+
+            const onStackTraceResponse = (data) => {
+                this.variables.frames = data.body.stackFrames;
+                const frameId = data.body.stackFrames[0].id;
+                this.socket.doRequest(this.command.scopes(frameId));
+            };
+
+            const onScopesResponse = (data) => {
+                this.variables.scopes = data.body.scopes;
+                const scope = data.body.scopes[0].variablesReference;
+                this.socket.doRequest(this.command.variable(scope));
+            };
+
+            const onVariablesResponse = (data) => {
+                if (!this.variables.switch) {
+                    this.variables.locals = data.body.variables;
+                    const scope = this.variables.scopes[1].variablesReference;
+                    this.socket.doRequest(this.command.variable(scope));
+                    this.variables.scopes = [];
+                    this.variables.switch = true;
+                } else {
+                    this.variables.globals = data.body.variables;
+                    this.variables.switch = false;
+                    resolve(this.formatedData());
+                }
+            };
+
+            // Remove existing listeners
+            this.socket.removeListeners('event_stopped');
+            this.socket.removeListeners('response_stackTrace');
+            this.socket.removeListeners('response_scopes');
+            this.socket.removeListeners('response_variables');
+
+            // Attach new listeners
+            this.socket.on('event_stopped', onStopped);
+            this.socket.on('response_stackTrace', onStackTraceResponse);
+            this.socket.on('response_scopes', onScopesResponse);
+            this.socket.on('response_variables', onVariablesResponse);
+        });
+    }
+
+    private formatedData() {
+        return {
+            locals: this.variables.locals,
+            globals: this.variables.globals,
+            frames: this.variables.frames
+        }
     }
 
     private setupHandlers() {
         this.socket.on('data', this.bindHandler("onDataHandler"));
-        this.socket.on('event_thread', this.bindHandler("onThread"));
-        this.socket.on('event_stopped', this.bindHandler("onStopped"));
-
-        this.socket.on('response_stackTrace', this.bindHandler("onStackTrace"));
-        this.socket.on('response_scopes', this.bindHandler("onScopes"));
-        this.socket.on('response_variables', this.bindHandler("onVariables"));
-    }
-
-    private startProcess() {
-        if (this.shareState.commands.length == 0) {
-            return;
-        }
-        this.socket.doRequest(this.shareState.commands.shift());
     }
 
     private bindHandler(fnc_name: string) {
@@ -48,45 +114,5 @@ export class DebuggerHandler {
 
     private onDataHandler(data: any) {
         console.log(JSON.stringify(data, null, 2));
-    }
-
-    private onVariables(data) {
-        if (!this.variables.switch) {
-            this.variables.locals = data.body.variables;
-            const scope = this.variables.scopes[1].variablesReference
-            this.socket.doRequest(this.command.variable(scope));
-            this.variables.scopes = [];
-            this.variables.switch = true;
-        } else {
-            this.variables.globals = data.body.variables;
-            this.variables.switch = false;
-        }
-    }
-
-    private onScopes(data) {
-        this.variables.scopes = data.body.scopes;
-        const scope = data.body.scopes[0].variablesReference
-        this.socket.doRequest(this.command.variable(scope));
-    }
-
-    private onStackTrace(data) {
-        const frameId = data.body.stackFrames[0].id;
-        this.socket.doRequest(this.command.scopes(frameId));
-    }
-
-
-    private onStopped(data) {
-        if (data.body.reason == "breakpoint" || data.body.reason == "step") {
-            const threadId = this.shareState.threadId;
-            this.socket.doRequest(this.command.stackTrace(threadId));
-        }
-    }
-
-    private onThread(data) {
-        if (data.event == "thread" && data.body.reason == "started") {
-            this.shareState.threadId = data.body.threadId;
-            this.shareState.start = true;
-            this.startProcess();
-        }   
     }
 }
