@@ -16,7 +16,7 @@ export class DebuggerCommand {
                 columnsStartAt1: true,                                                
                 pathFormat: 'path',
                 supportsVariableType: true,
-                supportsVariablePaging: false,
+                supportsVariablePaging: true,
                 supportsRunInTerminalRequest: false,
             }
         };
@@ -115,6 +115,46 @@ export class DebuggerCommand {
             command: 'variables',
             arguments: {
                 variablesReference
+            }            
+        }
+        return commnad;
+    }
+
+    stepIn(threadId: number, granularity: 'statement' | 'line' | 'instruction') {
+        const commnad: DebugProtocol.StepInRequest = {
+            seq: 0,
+            type: 'request',
+            command: 'stepIn',
+            arguments: {
+                threadId: threadId,
+                singleThread: true,
+                granularity: granularity
+            }            
+        }
+        return commnad;
+    }
+
+    stepOut(threadId: number, granularity: 'statement' | 'line' | 'instruction') {
+        const commnad: DebugProtocol.StepInRequest = {
+            seq: 0,
+            type: 'request',
+            command: 'stepOut',
+            arguments: {
+                threadId: threadId,
+                singleThread: true,
+                granularity: granularity
+            }            
+        }
+        return commnad;
+    }
+
+    terminate() {
+        const commnad: DebugProtocol.TerminateRequest = {
+            seq: 0,
+            type: 'request',
+            command: 'terminate',
+            arguments: {
+                restart: false
             }            
         }
         return commnad;

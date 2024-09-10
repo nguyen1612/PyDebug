@@ -7,15 +7,27 @@ import { Client } from "./helpers/Client";
 
     // Assuming the user get all info of the current debugger
     const path = './test/test-1.py';
-    const breakpoints = [{ line: 27 }];
+    const breakpoints = [{ line: 28 }];
     let data = <any>await client.setBreakPoints(path, breakpoints);
-    console.log(data.frames);
+    // console.log(data.locals);
 
     data = await client.next();
-    console.log(data.frames);
+    // console.log(data.locals);
 
     data = await client.next();
-    console.log(data.frames);
+    console.log(data.locals);
+
+    data = await client.stepIn();
+    console.log(data.locals);
+
+    data = await client.next();
+    console.log(data.locals);
+
+    data = await client.stepOut();
+    console.log(data.locals);
+
+    data = await client.next();
+    console.log(data.locals);
 
     await client.destroy();
 })();

@@ -1,6 +1,7 @@
 import { DebuggerCommand } from "./DebuggerCommand";
 import { SocketConnector } from "./SocketConnector";
 
+let i = 0;
 export class DebuggerHandler {
     private socket: SocketConnector;
     private shareState: any;
@@ -93,6 +94,43 @@ export class DebuggerHandler {
             this.socket.on('response_variables', onVariablesResponse);
         });
     }
+
+    public stepIn() {
+        const threadId = this.shareState.threadId;
+        if (threadId || threadId == 0) {
+            this.socket.doRequest(this.command.stepIn(threadId, "line"));
+            return new Promise((res, _) => {
+                this.socket.removeListeners('response_stepIn');
+                this.socket.on('response_stepIn', () => {
+                    res(true);
+                });
+            })
+        }
+    }
+
+    public stepOut() {
+        const threadId = this.shareState.threadId;
+        if (threadId || threadId == 0) {
+            this.socket.doRequest(this.command.stepOut(threadId, "line"));
+            return new Promise((res, _) => {
+                this.socket.removeListeners('response_stepOut');
+                this.socket.on('response_stepOut', () => {
+                    res(true);
+                });
+            })
+        }
+    }
+
+    public terminate() {
+        this.socket.doRequest(this.command.terminate());
+            return new Promise((res, _) => {
+                this.socket.removeListeners('response_terminate');
+                this.socket.on('response_terminate', () => {
+                    res(true);
+                });
+            })
+    }
+
 
     private formatedData() {
         return {

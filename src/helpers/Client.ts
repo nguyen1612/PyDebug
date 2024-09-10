@@ -31,7 +31,18 @@ export class Client {
         return await this.handler.getCurrentStateData();
     }
 
+    async stepIn() {
+        await this.handler.stepIn();
+        return await this.handler.getCurrentStateData();
+    }
+
+    async stepOut() {
+        await this.handler.stepOut();
+        return await this.handler.getCurrentStateData();
+    }
+
     async destroy() {
+        await this.handler.terminate();
         this.socket.destroy();
     }
 }

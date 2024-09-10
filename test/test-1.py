@@ -17,7 +17,8 @@ class User:
 
 def callMe():
     a = 10
-    return a * a
+    c = 100
+    return a + c
 
 
 users_list = [User("test1", "test1@mail.com")]
@@ -26,5 +27,5 @@ a = 1
 for user in users_list:
     a += 1
     b = 11
-    callMe()
-    # user.do_something()
+    c = callMe()
+    # user.do_something() __pydevd_ret_val_dict['callMe']
